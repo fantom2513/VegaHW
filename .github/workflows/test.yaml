@@ -1,48 +1,45 @@
-name: basic
-on: [push]
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
 jobs:
+  documentation:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y cmake
-      - run: mkdir build && cmake -B build -S . && cmake --build build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: binaries
-          path: |
-            build/main
-            build/tests
-            build/bench
 
-  tests:
-    needs: [build]
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libgtest-dev doxygen
+
+      - name: Set up CMake
+        run: cmake -S . -B build
+
+      - name: Build project
+        run: cmake --build build -- -j
+
+      - name: Run tests
+        run: ./build/test_add
+
+      - name: Run benchmarks
+        run: ./build/benchmark_add --benchmark_format=json --benchmark_out=benchmark_results.json
+
+      - name: Generate Doxygen documentation
+        run: cmake --build build --target doc
+
+      - name: Deploy Documentation to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          name: binaries
-      - run: chmod +x tests && ./tests
-  run:
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: binaries
-      - run: chmod +x main && ./main 8 43
-  bench:
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: binaries
-      - run: chmod +x bench && ./bench
+          publish_dir: ./html
 
   docs:
     environment:
